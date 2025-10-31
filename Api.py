@@ -1,31 +1,41 @@
 from flask import Flask, request, jsonify
 from flask_cors import CORS
-import sqlite3
+import psycopg2
+from psycopg2.extras import RealDictCursor
 from datetime import datetime
+import os
 
 app = Flask(__name__)
-CORS(app)  # allows requests from React frontend
+CORS(app)
 
-# --- Create database and table if not exists ---
+# --- Database connection ---
+DB_URL = "postgresql://myinfra_user:NToAqUPNtRrOB44ZFrL1Rd6kxJg4e7SY@dpg-d42e6sp5pdvs73d16sug-a/myinfra"
+
+def get_db_connection():
+    conn = psycopg2.connect(DB_URL, cursor_factory=RealDictCursor)
+    return conn
+
+# --- Create table if not exists ---
 def init_db():
-    conn = sqlite3.connect("enquiries.db")
-    cursor = conn.cursor()
-    cursor.execute("""
+    conn = get_db_connection()
+    cur = conn.cursor()
+    cur.execute("""
         CREATE TABLE IF NOT EXISTS enquiries (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            id SERIAL PRIMARY KEY,
             name TEXT NOT NULL,
             phone TEXT NOT NULL,
             email TEXT NOT NULL,
             message TEXT,
-            created_at TEXT
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
         )
     """)
     conn.commit()
+    cur.close()
     conn.close()
 
 init_db()
 
-# --- Route to save enquiry ---
+# --- Save enquiry ---
 @app.route("/api/enquiry", methods=["POST"])
 def save_enquiry():
     try:
@@ -35,17 +45,17 @@ def save_enquiry():
         email = data.get("email")
         message = data.get("message")
 
-        # Simple validation
         if not name or not phone or not email:
             return jsonify({"error": "Missing required fields"}), 400
 
-        conn = sqlite3.connect("enquiries.db")
-        cursor = conn.cursor()
-        cursor.execute("""
+        conn = get_db_connection()
+        cur = conn.cursor()
+        cur.execute("""
             INSERT INTO enquiries (name, phone, email, message, created_at)
-            VALUES (?, ?, ?, ?, ?)
-        """, (name, phone, email, message, datetime.now().strftime("%Y-%m-%d %H:%M:%S")))
+            VALUES (%s, %s, %s, %s, %s)
+        """, (name, phone, email, message, datetime.now()))
         conn.commit()
+        cur.close()
         conn.close()
 
         return jsonify({"success": True, "message": "Enquiry saved successfully!"})
@@ -53,29 +63,20 @@ def save_enquiry():
         return jsonify({"error": str(e)}), 500
 
 
-# --- Route to view all enquiries (for admin use) ---
+# --- Get all enquiries ---
 @app.route("/api/enquiries", methods=["GET"])
 def get_enquiries():
-    conn = sqlite3.connect("enquiries.db")
-    cursor = conn.cursor()
-    cursor.execute("SELECT * FROM enquiries ORDER BY id DESC")
-    rows = cursor.fetchall()
-    conn.close()
-
-    enquiries = [
-        {
-            "id": row[0],
-            "name": row[1],
-            "phone": row[2],
-            "email": row[3],
-            "message": row[4],
-            "created_at": row[5],
-        }
-        for row in rows
-    ]
-    return jsonify(enquiries)
+    try:
+        conn = get_db_connection()
+        cur = conn.cursor()
+        cur.execute("SELECT * FROM enquiries ORDER BY id DESC")
+        rows = cur.fetchall()
+        cur.close()
+        conn.close()
+        return jsonify(rows)
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
 
 
 if __name__ == "__main__":
-    app.run(host="0.0.0.0", port=5000) 
-
+    app.run(host="0.0.0.0", port=5000)
