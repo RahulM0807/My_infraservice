@@ -87,5 +87,80 @@ def get_enquiries():
         return jsonify({"error": str(e)}), 500
 
 
+
+# ✅ 2️⃣ Save Cost Estimator data
+@app.route("/api/save_estimate", methods=["POST"])
+def save_estimate():
+    try:
+        data = request.get_json()
+        name = data.get("name")
+        phone = data.get("phone")
+        plot_size = data.get("plotSize")
+        floors = data.get("floors")
+        location = data.get("location")
+        built_up_area = data.get("builtUpArea")
+
+        if not name or not phone:
+            return jsonify({"error": "Name and Phone are required"}), 400
+
+        with get_connection() as conn:
+            with conn.cursor() as cur:
+                cur.execute("""
+                    CREATE TABLE IF NOT EXISTS estimates (
+                        id SERIAL PRIMARY KEY,
+                        name TEXT NOT NULL,
+                        phone TEXT NOT NULL,
+                        plot_size TEXT,
+                        floors TEXT,
+                        location TEXT,
+                        built_up_area INTEGER,
+                        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+                    )
+                """)
+
+                cur.execute("""
+                    INSERT INTO estimates (name, phone, plot_size, floors, location, built_up_area, created_at)
+                    VALUES (%s, %s, %s, %s, %s, %s, %s)
+                """, (name, phone, plot_size, floors, location, built_up_area, datetime.now()))
+
+        return jsonify({"success": True, "message": "✅ Estimate saved successfully!"}), 201
+
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+
+# ✅ 3️⃣ Get all saved estimates
+@app.route("/api/estimates", methods=["GET"])
+def get_estimates():
+    try:
+        with get_connection() as conn:
+            with conn.cursor() as cur:
+                cur.execute("""
+                    SELECT id, name, phone, plot_size, floors, location, built_up_area, created_at
+                    FROM estimates
+                    ORDER BY created_at DESC
+                """)
+                rows = cur.fetchall()
+
+        estimates = [
+            {
+                "id": r[0],
+                "name": r[1],
+                "phone": r[2],
+                "plot_size": r[3],
+                "floors": r[4],
+                "location": r[5],
+                "built_up_area": r[6],
+                "created_at": r[7].strftime("%Y-%m-%d %H:%M:%S") if r[7] else None,
+            }
+            for r in rows
+        ]
+
+        return jsonify(estimates)
+
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+
 if __name__ == "__main__":
     app.run(host="0.0.0.0", port=5000)
