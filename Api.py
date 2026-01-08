@@ -10,7 +10,7 @@ CORS(app)
 # Use Render's DATABASE_URL or local fallback
 DATABASE_URL = os.environ.get(
     "DATABASE_URL",
-    "postgresql://myinfra_user:NToAqUPNtRrOB44ZFrL1Rd6kxJg4e7SY@dpg-d42e6sp5pdvs73d16sug-a/myinfra"
+    "postgresql://myinfra_user:esh0Tan9dRhLtUhaRrKsiSzFlCbp6G9x@dpg-d5evlrnpm1nc7381dbsg-a.oregon-postgres.render.com/myinfra_n6ic"
 )
 
 def get_connection():
